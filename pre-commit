@@ -1,0 +1,65 @@
+#!/bin/bash
+
+login=forget_c
+function coding
+{
+  sed "s/ *$//g" $1 |
+  sed "s/\t/  /g"   |
+  sed -r "s/^(.{80})(..*)$/\1\n\2/g"|
+  sed -r "s/ sizeof\(/ sizeof \(/g"|
+  sed -r "s/,([a-zA-Z])/, \1/g" > $1.cod
+  diff $1 $1.cod > /dev/null 2>&1
+  if [ $? -eq 1 ]; then
+    vimdiff $1 $1.cod
+  fi
+  rm $1.cod
+}
+#
+# Make Authors
+#
+if [ -f AUTHORS ];then
+  if ! diff AUTHORS <(echo "* "$login) > /dev/null;then
+    printf "\e[31m Wrong Authors \e[39m\n"
+    exit 1
+  fi
+else
+  printf "\e[31m no Authors \e[39m\n"
+  exit 1
+fi
+
+#
+# Make Readme
+#
+if [ -f README ];then
+  if [ ! -s README ];then
+    printf "\e[31m README empty \e[39m\n"
+    exit 1
+  fi
+else
+  printf "\e[31m no README \e[39m\n"
+  exit 1
+fi
+
+#
+# Make Todo
+#
+if [ ! -s TODO ];then
+  grep -E "^[0-9](.*)( \.)+" subject.txt | sed -r 's/^([0-9]\.?)+([a-zA-Z ’:?]+)(.*)*/\2/' | sed -E "s/(.*)/\1\t\t[ANALYSIS]\t[$login]/" > TODO
+fi
+
+#
+# Coding Style
+#
+for i in $(find . -type f \( -name *.[ch] -o -name *.[ch][ch] -o -name *.hxx \));
+do
+  coding $i;
+  printf "$i \e[32m\t[CORRECTED]\e[39m\n"
+done
+
+#
+# Update TODO
+#
+
+if git diff-index --quiet HEAD -- TODO; then
+  vim TODO
+fi
