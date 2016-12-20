@@ -1,59 +1,170 @@
 #!/bin/bash
+#set -x
 
-login=forget_c
+login="forget_c segar_h"
+ignore_files=".ignore_coding_style .gin"
 function coding
+{
+  ret=0
+  check_coding $1
+  diff $1 $1.cod &> /dev/null
+  if [ $? -eq 1 ]; then
+    vim -d "+nnoremap <enter> :xa<cr>" $1 $1.cod
+    [[ ! -t 0 ]] && reset
+  else
+    ret=1
+  fi
+
+  check_coding $1
+  diff $1 $1.cod &> /dev/null
+  if [ $? -eq 1 ]; then
+    ret=2
+    read -p "Auto correct :(Y/n)" correct
+    [[ ! $correct = "n" ]] && cp $1.cod $1 && ret=3
+  fi
+  rm $1.cod
+  git add $1
+  return "$ret"
+}
+
+function check_coding
 {
   sed "s/ *$//g" $1 |
   sed "s/\t/  /g"   |
   sed -r "s/^(.{80})(..*)$/\1\n\2/g"|
   sed -r "s/ sizeof\(/ sizeof \(/g"|
   sed -r "s/,([a-zA-Z])/, \1/g" > $1.cod
-  diff $1 $1.cod > /dev/null 2>&1
-  if [ $? -eq 1 ]; then
-    vimdiff $1 $1.cod
-  fi
-  rm $1.cod
 }
+
 #
 # Make Authors
 #
-if [ -f AUTHORS ];then
-  if ! diff AUTHORS <(echo "* "$login) > /dev/null;then
-    printf "\e[31m Wrong Authors \e[39m\n"
+function print_authors
+{
+  for i in $@;
+  do
+    echo "* "$i;
+  done
+}
+
+function make_authors
+{
+  if [ -s AUTHORS ];then
+    if ! diff AUTHORS <(print_authors $@) > /dev/null;then
+      printf "\e[31m Wrong Authors \e[39m\n"
+      exit 1
+    fi
+  else
+    printf "\e[31m no Authors \e[39m\n"
+    print_authors $@ > AUTHORS
+    git add AUTHORS
     exit 1
   fi
-else
-  printf "\e[31m no Authors \e[39m\n"
-  exit 1
-fi
+}
 
 #
 # Make Readme
 #
-if [ -f README ];then
-  if [ ! -s README ];then
-    printf "\e[31m README empty \e[39m\n"
+function make_readme
+{
+  if [ -f README ];then
+    if [ ! -s README ];then
+      printf "\e[31m README empty \e[39m\n"
+      exit 1
+    fi
+  else
+    printf "\e[31m no README \e[39m\n"
     exit 1
   fi
-else
-  printf "\e[31m no README \e[39m\n"
-  exit 1
-fi
+}
 
 #
 # Make Todo
 #
-if [ ! -s TODO ];then
-  grep -E "^[0-9](.*)( \.)+" subject.txt | sed -r 's/^([0-9]\.?)+([a-zA-Z ’:?]+)(.*)*/\2/' | sed -E "s/(.*)/\1\t\t[ANALYSIS]\t[$login]/" > TODO
-fi
+function make_todo
+{
+  if [ ! -s TODO ];then
+    printf "TODO:\n" > TODO
+    local test=$(pdftotext $1 /dev/stdout |
+    grep -E "^[0-9](.*)( \.)+" |
+    sed -r 's/^([0-9]\.?)+([a-zA-Z ’:?0-9]+)(.*)*/\2/' |
+    tr '\n' '@')
+    local OIFF=$IFS
+    local IFS="@"
+    local cnt=0
+    for i in $test;
+    do
+      [[ cnt -lt ${#i} ]] && cnt=${#i}
+    done
+    for i in $test;
+    do
+      local c=$((cnt - ${#i}))
+      [[ ! ${#i} -lt 2 ]] &&
+        printf $i"%-$c""s""\t[ANALYSIS]\t[$login]\n" >> TODO ;
+    done
+    #IFS=$OIFS
+  fi
+}
 
+function make_archi
+{
+  local test=$(pdftotext $1 /dev/stdout |
+    grep "^\./[[:alpha:]]" |
+    sed "s/*//" |
+    sed "s/^\.\///" );
+  for i in $test
+  do
+    if [[ "$i" =~ \/$ ]]; then
+      mkdir $i
+    else
+      touch $i
+    fi
+  done
+}
+
+function print_ignore_files
+{
+  printf " -path ./.git"
+  for i in $ignore_files;
+  do
+    while read in; do
+      printf " -o -path ./$in"
+    done < $i
+  done
+}
+[ ! -f AUTHORS -o ! -f TODO ] && make_archi subject.pdf
+make_authors $login
+make_todo subject.pdf
+make_readme
 #
 # Coding Style
 #
-for i in $(find . -type f \( -name *.[ch] -o -name *.[ch][ch] -o -name *.hxx \));
+  for i in $(find .         \
+    \(                      \
+    $(print_ignore_files) \
+    \) -prune               \
+    -o                      \
+    \(                      \
+    -type f               \
+    \(                    \
+    -name "*.[ch]" -o -name "*.[ch][ch]" -o -name "*.hxx" \
+    \)                    \
+    \) -print               \
+    )
 do
-  coding $i;
-  printf "$i \e[32m\t[CORRECTED]\e[39m\n"
+  inf=""
+  coding $i
+  case $? in
+    0)
+      inf="CORRECTED";;
+    1)
+      inf="NO ERROR";;
+    2)
+      inf="NOT CORRECTED";;
+    3)
+      inf="AUTO CORRECTED";;
+  esac
+  printf "$i \e[32m\t[$inf]\e[39m\n"
 done
 
 #
@@ -62,4 +173,6 @@ done
 
 if git diff-index --quiet HEAD -- TODO; then
   vim TODO
+  git add TODO
+  [[ ! -t 0 ]] && reset
 fi
