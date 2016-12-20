@@ -1,117 +1,207 @@
 #!/bin/bash
 #set -x
 
-login="forget_c segar_h"
-ignore_files=".ignore_coding_style .gin"
+login="forget_c"
+ignore_files=""
+path_subject="subject.pdf"
+step=("ANALYSIS" "DEVELOP" "REVIEW" "FAT" "DONE")
+
+#
+# correct the coding style
+# $1 file to correct
+# $? info on correction
+#
 function coding
 {
-  ret=0
-  check_coding $1
-  diff $1 $1.cod &> /dev/null
+  local ret=0
+  local file=$1
+  check_coding $file
+  diff $file $file.cod &> /dev/null
   if [ $? -eq 1 ]; then
-    vim -d "+nnoremap <enter> :xa<cr>" $1 $1.cod
+    vim -d "+nnoremap <enter> :xa<cr>" $file $file.cod
     [[ ! -t 0 ]] && reset
   else
     ret=1
   fi
 
-  check_coding $1
-  diff $1 $1.cod &> /dev/null
+  check_coding $file
+  diff $file $file.cod &> /dev/null
   if [ $? -eq 1 ]; then
     ret=2
     read -p "Auto correct :(Y/n)" correct
-    [[ ! $correct = "n" ]] && cp $1.cod $1 && ret=3
+    [[ ! $correct = "n" ]] && cp $file.cod $file && ret=3
   fi
   rm $1.cod
   git add $1
   return "$ret"
 }
 
+#
+# stock correct coding style of file in file.cod
+# $1 file to correct
+#
 function check_coding
 {
-  sed "s/ *$//g" $1 |
+  local file=$1
+  sed "s/ *$//g" $file |
   sed "s/\t/  /g"   |
   sed -r "s/^(.{80})(..*)$/\1\n\2/g"|
   sed -r "s/ sizeof\(/ sizeof \(/g"|
-  sed -r "s/,([a-zA-Z])/, \1/g" > $1.cod
+  sed -r "s/,([a-zA-Z])/, \1/g" > $file.cod
 }
 
 #
-# Make Authors
+# launch Coding Style
 #
-function print_authors
+function launch_correction
 {
-  for i in $@;
-  do
-    echo "* "$i;
-  done
+  for i in $(find .                                        \
+    \(                                                     \
+    $(print_ignore_files)                                  \
+    \) -prune                                              \
+    -o                                                     \
+    \(                                                     \
+    -type f                                                \
+    \(                                                     \
+    -name "*.[ch]" -o -name "*.[sch][ch]" -o -name "*.hxx" \
+    \)                                                     \
+    \) -print                                              \
+    )
+do
+  inf=""
+  coding $i
+  case $? in
+    0)
+      inf="CORRECTED";;
+    1)
+      inf="NO ERROR";;
+    2)
+      inf="NOT CORRECTED";;
+    3)
+      inf="AUTO CORRECTED";;
+  esac
+  printf "$i \e[32m\t[$inf]\e[39m\n"
+done
 }
 
+
+#
+# print Authors
+# $@ list of AUTHORS
+#
 function make_authors
 {
+  #
+  # print Authors
+  # $@ list of AUTHORS
+  #
+  function print_authors { for i in $@; do echo "* "$i; done }
+
   if [ -s AUTHORS ];then
     if ! diff AUTHORS <(print_authors $@) > /dev/null;then
       printf "\e[31m Wrong Authors \e[39m\n"
-      exit 1
+      read -p "Do you want to correct ?(Y/n)" correct
+      [[ ! $correct = "n" ]] && print_authors $@ > AUTHORS || exit 1
     fi
   else
     printf "\e[31m no Authors \e[39m\n"
     print_authors $@ > AUTHORS
-    git add AUTHORS
-    exit 1
   fi
+  git add AUTHORS
 }
 
+function print_nchar
+{
+  local char=$1
+  local n=$2
+  printf "%-$n""s" | tr ' ' "$char"
+}
 #
 # Make Readme
 #
 function make_readme
 {
-  if [ -f README ];then
-    if [ ! -s README ];then
-      printf "\e[31m README empty \e[39m\n"
-      exit 1
-    fi
-  else
-    printf "\e[31m no README \e[39m\n"
-    exit 1
-  fi
+  local IFS="\t\n"
+  # principal header
+  echo $(print_nchar '=' 80)         >  README
+  echo $(print_nchar ' ' 37)"README" >> README
+  echo $(print_nchar '=' 80)         >> README
+  printf "\n\n\n"                    >> README
+  # category
+  for i in "GENERAL INFO" GOAL USAGE CHANGELOG;
+  do
+    printf $(print_nchar '=' $((39 - $((${#i} / 2)))))           >> README
+    printf " $i "                                                >> README
+    printf $(print_nchar '=' $((39 - $(((${#i} + 1) / 2)))))"\n" >> README
+    printf "\n\n"                                                >> README
+    case $i in
+      "GENERAL INFO")
+        echo "  Contributors: $login"                            >> README
+        echo "  License: GNU General Public License v3.0"        >> README
+        echo "  Version: v1.0"                                   >> README
+        ;;
+      USAGE)
+        if [ -f CMakeLists.txt ];then
+          echo "To get the Makefile : 'mkdir build && cd build && cmake ..'" >> README
+        fi
+        if [ -f Makefile -o -f CMakeLists.txt ];then
+          echo "To compile the project to get the binary file: 'make or make all'" >> README
+          echo "To clean the project: 'make clean'"     >> README
+          echo "To launch the test suite: 'make check'" >> README
+        fi
+        ;;
+      *)
+        echo "  ##FIXME##"                                       >> README
+        ;;
+    esac
+    printf "\n\n"                                                >> README
+  done
 }
 
 #
 # Make Todo
+# $1 subject to parse
 #
 function make_todo
 {
-  if [ ! -s TODO ];then
-    printf "TODO:\n" > TODO
-    local test=$(pdftotext $1 /dev/stdout |
-    grep -E "^[0-9](.*)( \.)+" |
-    sed -r 's/^([0-9]\.?)+([a-zA-Z ’:?0-9]+)(.*)*/\2/' |
-    tr '\n' '@')
-    local OIFF=$IFS
-    local IFS="@"
-    local cnt=0
-    for i in $test;
-    do
-      [[ cnt -lt ${#i} ]] && cnt=${#i}
-    done
-    for i in $test;
-    do
-      local c=$((cnt - ${#i}))
-      [[ ! ${#i} -lt 2 ]] &&
-        printf $i"%-$c""s""\t[ANALYSIS]\t[$login]\n" >> TODO ;
-    done
-    #IFS=$OIFS
-  fi
+  [[ ! -f $1 ]] && return 1
+  printf "TODO:\n" > TODO
+
+  #get summary
+  local test=$(pdftotext $1 /dev/stdout |
+  grep -E "^[0-9](.*)( \.)+" |
+  sed -r 's/^([0-9]\.?)+([a-zA-Z ’:?0-9]+)(.*)*/\2/' |
+  tr '\n' '@')
+
+  local IFS="@"
+
+  #padding
+  local cnt=0
+  for i in $test;
+  do
+    [[ $cnt -lt ${#i} ]] && cnt=${#i}
+  done
+
+  #write TODO
+  for i in $test;
+  do
+    local c=$((cnt - ${#i}))
+    [[ ! ${#i} -lt 2 ]] &&
+      printf $i"%-$c""s""\t[${step[0]}]\t[$login]\n" >> TODO ;
+  done
 }
 
+#
+# Create architecture
+# $1 subject to parse
+#
 function make_archi
 {
+  [[ ! -f $1 ]] && return 1
   local test=$(pdftotext $1 /dev/stdout |
-    grep "^\./[[:alpha:]]" |
-    sed "s/*//" |
-    sed "s/^\.\///" );
+  grep "^\./[[:alpha:]]" |
+  sed "s/*//" |
+  sed "s/^\.\///" );
   for i in $test
   do
     if [[ "$i" =~ \/$ ]]; then
@@ -132,47 +222,81 @@ function print_ignore_files
     done < $i
   done
 }
-[ ! -f AUTHORS -o ! -f TODO ] && make_archi subject.pdf
-make_authors $login
-make_todo subject.pdf
-make_readme
-#
-# Coding Style
-#
-  for i in $(find .         \
-    \(                      \
-    $(print_ignore_files) \
-    \) -prune               \
-    -o                      \
-    \(                      \
-    -type f               \
-    \(                    \
-    -name "*.[ch]" -o -name "*.[ch][ch]" -o -name "*.hxx" \
-    \)                    \
-    \) -print               \
-    )
-do
-  inf=""
-  coding $i
-  case $? in
-    0)
-      inf="CORRECTED";;
-    1)
-      inf="NO ERROR";;
-    2)
-      inf="NOT CORRECTED";;
-    3)
-      inf="AUTO CORRECTED";;
-  esac
-  printf "$i \e[32m\t[$inf]\e[39m\n"
-done
 
 #
 # Update TODO
 #
+function update_todo
+{
+  read -r -a logins <<< "$login"
+  local todomap="+map <enter> bde"
 
-if git diff-index --quiet HEAD -- TODO; then
-  vim TODO
+  # map for steps
+  local s_size=$((${#step[@]} - 1))
+  todomap+=":if @\" =~ '^${step[$s_size]}$' <cr> execute \"normal! i${step[0]}\"<cr>"
+  for (( i=0; i < s_size ; i++ ))
+  do
+    todomap+=":elseif @\" =~ '^${step[$i]}$' <cr> execute \"normal! i${step[$(($i + 1))]}\"<cr>"
+  done
+
+  # map for login
+  local l_size=$((${#logins[@]} -1))
+  todomap+=":elseif @\" =~ '^${logins[$l_size]}$' <cr> execute \"normal! i${logins[0]}\"<cr>"
+  for (( i=0; i < l_size ; i++ ))
+  do
+    todomap+=":elseif @\" =~ '^${logins[$i]}$' <cr> execute \"normal! i${logins[$(($i + 1))]}\"<cr>"
+  done
+  todomap+=":else <cr> execute \"normal! hp\"<cr>"
+  todomap+="endif<cr><cr>"
+
+  #launch todo editor
+  vim \
+    "+map 1 bdeiANALYSIS<esc>" \
+    "+map 2 bdeiDEVELOP<esc>"  \
+    "+map 3 bdeiREVIEW<esc>"\
+    "+map 4 bdeiFAT<esc>"\
+    "+map 5 bdeiDONE<esc>"\
+    "$todomap"\
+    TODO
   git add TODO
   [[ ! -t 0 ]] && reset
+}
+
+if [ ! -t 0 -o $# -eq 0 ];
+then
+  if [ -s $path_subject ];
+  then
+    [ ! -f AUTHORS -o ! -f TODO ] && make_archi $path_subject
+    if [ ! -s TODO ];then
+      make_todo $path_subject
+    fi
+  fi
+  make_authors $login
+  if [ ! -s README ];then
+    make_readme
+  fi
+  launch_correction
+  if git diff-index --quiet HEAD -- TODO; then
+    update_todo
+  fi
+elif [ $1 == "-ut" ];
+then
+  update_todo
+elif [ $1 == "-c" ];
+then
+  launch_correction
+elif [ $1 == "-a" ];
+then
+  make_authors $login
+elif [ $1 == "-r" ];
+then
+  make_readme
+elif [ $1 == "-t" ];
+then
+  make_todo $2
+elif [ $1 == "-init" ];
+then
+  make_archi $2
+else
+  echo "Usage: $0 [-ut] [-c] [-a] [-r] [-t file] [-init file]"
 fi
