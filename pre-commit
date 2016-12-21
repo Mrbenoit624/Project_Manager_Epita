@@ -1,5 +1,15 @@
 #!/bin/bash
 
+if [ ! -t 0 ]; then
+  [ -z "$(grep "TTY" < ~/.bashrc)" ] &&
+  echo 'TTY=$(tty)' >> ~/.bashrc &&
+  echo 'export TTY' >> ~/.bashrc &&
+  echo "relaunch your terminal please" &&
+  exit 1
+else
+  TTY=$(tty)
+fi
+
 login="forget_c"
 ignore_files=""
 path_subject="subject.pdf"
@@ -25,8 +35,7 @@ function coding
   check_coding $file
   diff $file $file.cod &> /dev/null
   if [ $? -eq 1 ]; then
-    vim -d "+nnoremap <enter> :xa<cr>" $file $file.cod
-    [[ ! -t 0 ]] && reset
+    vim -d "+nnoremap <enter> :xa<cr>" $file $file.cod < $TTY
   else
     ret=1
   fi
@@ -35,7 +44,7 @@ function coding
   diff $file $file.cod &> /dev/null
   if [ $? -eq 1 ]; then
     ret=2
-    read -p "Auto correct :(Y/n)" correct
+    read -p "Auto correct :(Y/n)" correct < $TTY
     [[ ! $correct = "n" ]] && cp $file.cod $file && ret=3
   fi
   rm $1.cod
@@ -107,7 +116,7 @@ function make_authors
   if [ -s AUTHORS ];then
     if ! diff AUTHORS <(print_authors $@) > /dev/null;then
       printf "\e[31m Wrong Authors \e[39m\n"
-      read -p "Do you want to correct ?(Y/n)" correct
+      read -p "Do you want to correct ?(Y/n)" correct < $TTY
       [[ ! $correct = "n" ]] && print_authors $@ > AUTHORS || exit 1
     fi
   else
@@ -270,9 +279,8 @@ function update_todo
     "+map 4 bdeiFAT<esc>"\
     "+map 5 bdeiDONE<esc>"\
     "$todomap"\
-    TODO
-  git add TODO
-  [[ ! -t 0 ]] && reset
+    TODO < $TTY
+  [ -f TODO ] && git add TODO
 }
 
 function generate_config
