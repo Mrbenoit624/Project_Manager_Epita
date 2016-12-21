@@ -334,6 +334,7 @@ then
   if git diff-index --quiet HEAD -- TODO; then
     update_todo
   fi
+  exit 0
 elif [ $1 == "-ut" ];
 then
   update_todo
