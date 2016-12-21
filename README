@@ -7,25 +7,95 @@
 ================================= GENERAL INFO =================================
 
 
+  Project: Hook Epita
   Contributors: forget_c
   License: GNU General Public License v3.0
-  Version: v1.0
+  Version: v1.5
+  Date: 12-21-16
+
+
+  Epita 2019 - ING 1
 
 
 ===================================== GOAL =====================================
 
 
-  ##FIXME##
+  The goal of this project is to generate automatically REDME TODO and the
+  architecture in order to help developers to work quickly.
+  An editor of TODO is also integrate.
 
 
 ===================================== USAGE ====================================
 
-  Usage: ./pre-commit [-ut] [-c] [-a] [-r] [-t file] [-init file]
+  You can put the pre-commit file in your hook if you want to use at each commit
+  but you con also use it just like a script.
+
+  Usage: ./pre-commit [-ut] [-c] [-a] [-r] [-t file] [-init file] [-conf file]
+
+  if you use:
+    ./pre-commit
+    all functionalities should be used but not forced if it's exist it must not
+    executed
+
+  if you use:
+    ./pre-commit -ut
+    you launch the interactive editor of TODO
+    use <enter> to change a field
+
+  if you use:
+    ./pre-commit -c
+    a little correction of your coding style must be launch
+
+  if you use:
+    ./pre-commit -a
+    a AUTHORS must be generated
+
+  if you use:
+    ./pre-commit -r
+    a README like this must be generated but you can specified some field in
+    your config file {VERSION, DATE, PROJECT, LICENSE, INFO}
+
+  if you use:
+    ./pre-commit -t file
+    a TODO is generated thanks to the file give in parameter
+    the file supported is ACU 2017 subject
+
+
+  if you use:
+    ./pre-commit -init file
+    the architecture is generated thanks to the file give in parameter
+    the file supported is ACU 2017 subject
+
+  if you use:
+    ./pre-commit -t file
+    a conf file is generated thanks to the file give in parameter
+    the file supported is ACU 2017 subject
+
+  == GLOBAL VARIABLE ==
+    in the head of the scrip you can modify some variable
+
+    login: list of the login in the following format
+      login="login_x login_y"
+
+    ignore_files: list of the file contains the files or directory should not
+      be corrected by the corrector of the coding style.
+
+    path_subject: the path to the subject if you use the command without
+    parameter
+
+    step: list of the step in the todo in the following format
+      step=("STEP 1" "STEP 2")
+
+    config_file: the path where the config file is
+
+  == CONFIG FILE ==
+    The format is the following one:
+      VAR=VALUE
+
 
 
 =================================== CHANGELOG ==================================
 
 
-  ##FIXME##
 
 
