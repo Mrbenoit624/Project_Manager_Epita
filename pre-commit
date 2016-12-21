@@ -1,10 +1,17 @@
 #!/bin/bash
-#set -x
 
 login="forget_c"
 ignore_files=""
 path_subject="subject.pdf"
 step=("ANALYSIS" "DEVELOP" "REVIEW" "FAT" "DONE")
+
+config_file=".git/.config"
+
+date=$(date +"%m-%d-%y")
+versions="v1.0"
+license="GNU General Public License v3.0"
+project=""
+info="Epita 2019 - ING 1"
 
 #
 # correct the coding style
@@ -121,6 +128,7 @@ function print_nchar
 #
 function make_readme
 {
+  update_var_readme
   local IFS="\t\n"
   # principal header
   echo $(print_nchar '=' 80)         >  README
@@ -136,15 +144,20 @@ function make_readme
     printf "\n\n"                                                >> README
     case $i in
       "GENERAL INFO")
+        echo "  Project: $project"                               >> README
         echo "  Contributors: $login"                            >> README
-        echo "  License: GNU General Public License v3.0"        >> README
-        echo "  Version: v1.0"                                   >> README
+        echo "  License: $license"                               >> README
+        echo "  Version: $versions"                              >> README
+        echo "  Date: $date"                                     >> README
+        printf "\n\n  $info\n"                                   >> README
         ;;
       USAGE)
         if [ -f CMakeLists.txt ];then
           echo "To get the Makefile : 'mkdir build && cd build && cmake ..'" >> README
+        elif [ -f autogen.sh ];then
+          echo "To get the Makefile : './autogen.sh && ./configure'" >> README
         fi
-        if [ -f Makefile -o -f CMakeLists.txt ];then
+        if [ -f Makefile -o -f CMakeLists.txt -o -f autogen.sh ];then
           echo "To compile the project to get the binary file: 'make or make all'" >> README
           echo "To clean the project: 'make clean'"     >> README
           echo "To launch the test suite: 'make check'" >> README
@@ -262,6 +275,39 @@ function update_todo
   [[ ! -t 0 ]] && reset
 }
 
+function generate_config
+{
+  [[ ! -f $1 ]] && return 1
+  echo "PROJECT="$(pdftotext $1 /dev/stdout | head -n 1 | sed "s/ — Subject//I") >> "$config_file"
+  printf "DATE=" >> "$config_file"
+  pdftotext $1 /dev/stdout | grep -E "^[A-Z][a-z]+, [A-Z][a-z]+ [0-9]+, [0-9]+" | tr '\n' ':' >> "$config_file"
+  echo >> "$config_file"
+}
+
+function update_var_readme
+{
+  local IFS="="
+  while read var value
+  do
+    case $var in
+      "VERSION")
+        versions=$value
+        ;;
+      "DATE")
+        date=$value
+        ;;
+      "PROJECT")
+        project=$value
+        ;;
+      "LICENSE")
+        license=$value
+        ;;
+      "INFO")
+        info=$value
+    esac
+  done < $config_file
+}
+
 if [ ! -t 0 -o $# -eq 0 ];
 then
   if [ -s $path_subject ];
@@ -270,6 +316,7 @@ then
     if [ ! -s TODO ];then
       make_todo $path_subject
     fi
+    generate_config $path_subject
   fi
   make_authors $login
   if [ ! -s README ];then
@@ -297,6 +344,9 @@ then
 elif [ $1 == "-init" ];
 then
   make_archi $2
+elif [ $1 == "-conf" ];
+then
+  generate_config $2
 else
-  echo "Usage: $0 [-ut] [-c] [-a] [-r] [-t file] [-init file]"
+  echo "Usage: $0 [-ut] [-c] [-a] [-r] [-t file] [-init file] [-conf file]"
 fi
