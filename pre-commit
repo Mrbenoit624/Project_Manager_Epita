@@ -1,14 +1,8 @@
 #!/bin/bash
 
-if [ ! -t 0 ]; then
-  [ -z "$(grep "TTY" < ~/.bashrc)" ] &&
-  echo 'TTY=$(tty)' >> ~/.bashrc &&
-  echo 'export TTY' >> ~/.bashrc &&
-  echo "relaunch your terminal please" &&
-  exit 1
-else
-  TTY=$(tty)
-fi
+#
+#  Global Variable
+#
 
 login="forget_c"
 ignore_files=""
@@ -23,6 +17,18 @@ license="GNU General Public License v3.0"
 project=""
 info="Epita 2019 - ING 1"
 
+#
+#  End Global Variable
+#
+if [ ! -t 0 ]; then
+  [ -z "$(grep "TTY" < ~/.bashrc)" ] &&
+  echo 'TTY=$(tty)' >> ~/.bashrc &&
+  echo 'export TTY' >> ~/.bashrc &&
+  echo "relaunch your terminal please" &&
+  exit 1
+else
+  TTY=$(tty)
+fi
 #
 # correct the coding style
 # $1 file to correct
