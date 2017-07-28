@@ -16,6 +16,7 @@ versions="v1.0"
 license="GNU General Public License v3.0"
 project=""
 info="Epita 2019 - ING 1"
+clangformat=".clang-format"
 
 #
 #  End Global Variable
@@ -64,12 +65,17 @@ function coding
 #
 function check_coding
 {
-  local file=$1
-  sed "s/ *$//g" $file |
-  sed "s/\t/  /g"   |
-  sed -r "s/^(.{80})(..*)$/\1\n\2/g"|
-  sed -r "s/ sizeof\(/ sizeof \(/g"|
-  sed -r "s/,([a-zA-Z])/, \1/g" > $file.cod
+  local file="$1"
+  if [ -z $clangformat ]; then
+    cp $file $file.cod
+    clang-format -assume-filename=$clangformat -i $file.cod
+  else
+    sed "s/ *$//g" $file |
+    sed "s/\t/  /g"   |
+    sed -r "s/^(.{80})(..*)$/\1\n\2/g"|
+    sed -r "s/ sizeof\(/ sizeof \(/g"|
+    sed -r "s/,([a-zA-Z])/, \1/g" > $file.cod
+  fi
 }
 
 #
@@ -85,7 +91,7 @@ function launch_correction
     \(                                                     \
     -type f                                                \
     \(                                                     \
-    -name "*.[ch]" -o -name "*.[sch][ch]" -o -name "*.hxx" \
+    -name "*.[ch]" -o -name "*.[ch][ch]" -o -name "*.hxx" \
     \)                                                     \
     \) -print                                              \
     )
@@ -102,7 +108,9 @@ do
     3)
       inf="AUTO CORRECTED";;
   esac
-  printf "$i \e[32m\t[$inf]\e[39m\n"
+  printf "$i"
+  print_nchar ' ' $((80 - (${#i} + ${#inf})))
+  printf "\e[32m[$inf]\e[39m\n"
 done
 }
 

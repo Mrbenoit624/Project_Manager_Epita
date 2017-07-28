@@ -38,7 +38,8 @@
 
 * if you use:</br>
     ./pre-commit -c</br>
-    a little correction of your coding style must be launch
+    a little correction of your coding style must be launch  (a better
+        correction with clangformat, don' correct 25 lines in a functions)
 
 * if you use:</br>
     ./pre-commit -a</br>
@@ -80,6 +81,9 @@
       step=("STEP 1" "STEP 2")
 
     config_file: the path where the config file is
+
+    clangformat: the path of the clang format file to have a better correction
+    let an empty string if you don't have clang-format
 ### CONFIG FILE
     The format is the following one:</br>
       VAR=VALUE

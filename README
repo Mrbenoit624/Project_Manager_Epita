@@ -29,7 +29,7 @@
 ===================================== USAGE ====================================
 
   You can put the pre-commit file in your hook if you want to use at each commit
-  but you con also use it just like a script.
+  but you can also use it just like a script.
 
   Usage: ./pre-commit [-ut] [-c] [-a] [-r] [-t file] [-init file] [-conf file]
 
@@ -45,7 +45,8 @@
 
   if you use:
     ./pre-commit -c
-    a little correction of your coding style must be launch
+    a little correction of your coding style must be launch (a better
+        correction with clangformat, don' correct 25 lines in a functions)
 
   if you use:
     ./pre-commit -a
@@ -88,6 +89,9 @@
       step=("STEP 1" "STEP 2")
 
     config_file: the path where the config file is
+
+    clangformat: the path of the clang format file to have a better correction
+    let an empty string if you don't have clang-format
 
   == CONFIG FILE ==
     The format is the following one:
